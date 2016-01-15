@@ -111,7 +111,7 @@ $total = \Yii::$app->cart->getCost();
 If user have finished, and do checkout, so wen use following code
 
 ```php
-\Yii::$app->cart->removeAll(false); // will remove data
+\Yii::$app->cart->removeAll(); // will remove data
 // or
 \Yii::$app->cart->removeAll(false); // will keep data, only update status to 1 and regerenerate session ID
 ```
