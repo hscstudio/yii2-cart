@@ -15,13 +15,13 @@ The preferred way to install this extension is through [composer](http://getcomp
 Either run
 
 ```
-php composer.phar require --prefer-dist hscstudio/yii2-cart "*"
+php composer.phar require --prefer-dist hscstudio/yii2-cart "~1.0"
 ```
 
 or add
 
 ```json
-"hscstudio/yii2-cart": "*"
+"hscstudio/yii2-cart": "~1.0"
 ```
 
 to the `require` section of your composer.json.
