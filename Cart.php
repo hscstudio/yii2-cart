@@ -8,6 +8,7 @@ use yii\base\Event;
 use yii\di\Instance;
 use yii\web\Session;
 use yii\web\Cookie;
+use hscstudio\cart\LocalStorage;
 
 
 /**
@@ -37,6 +38,7 @@ class Cart extends Component
     /**
      * session (default) cart will be automatically stored in and loaded from session.
      * cookie cart will be automatically stored in and loaded from cookie.
+     * localStorage cart will be automatically stored in and loaded from localStorage.
 	 * database cart will be automatically stored in and loaded from database.
 	 * cookie_database cart will be automatically stored in and loaded from cookie (if guest) or database (if user).
 	 * session_database cart will be automatically stored in and loaded from session (if guest) or database (if user).
@@ -78,6 +80,11 @@ class Cart extends Component
 			if (isset($this->data[$this->cartId]))
 				$this->setSerialized($this->data[$this->cartId]);
 		}
+		else if($this->storeIn=='localStorage'){
+			$this->data = new LocalStorage();			
+			if ($this->data->has($this->cartId))
+				$this->setSerialized($this->data->get($this->cartId));
+		}
 		else if($this->storeIn=='database'){
 			$db = Yii::$app->db;
 			$session = Yii::$app->session;
@@ -112,7 +119,7 @@ class Cart extends Component
 				}
 			}
 		}
-		else if($this->storeIn=='cookie_database'){
+		else if($this->storeIn=='cookieDatabase'){
 			if (Yii::$app->user->isGuest){
 				$this->data = Yii::$app->request->cookies;
 				if (isset($this->data[$this->cartId]))
@@ -143,11 +150,42 @@ class Cart extends Component
 				}				
 			}
 		}
-		else if($this->storeIn=='session_database'){
+		else if($this->storeIn=='sessionDatabase'){
 			if (Yii::$app->user->isGuest){
 				$this->data = Yii::$app->session;
 				if (isset($this->data[$this->cartId]))
 					$this->setSerialized($this->data[$this->cartId]);
+			}
+			else{
+				$db = Yii::$app->db;
+				$session = Yii::$app->session;
+				$cartId = str_replace('\\','',$this->cartId);
+				$user_id = Yii::$app->user->id;
+				$this->data = $db->createCommand("
+						SELECT * FROM ".$this->table." 
+						WHERE 
+							(user_id=".$user_id." or id = '".$session->getId()."') and 
+							name='".$cartId."' and 
+							status=0 
+						LIMIT 1	
+					")    
+					->queryOne();
+				if($this->data){
+					$this->setSerialized($this->data['value']);
+				}
+				else{
+					$this->data = Yii::$app->session;
+					if (isset($this->data[$this->cartId]))
+						$this->setSerialized($this->data[$this->cartId]);
+					
+				}				
+			}
+		}
+		else if($this->storeIn=='localStorageDatabase'){
+			if (Yii::$app->user->isGuest){
+				$this->data = new LocalStorage();			
+				if ($this->data->has($this->cartId))
+					$this->setSerialized($this->data->get($this->cartId));
 			}
 			else{
 				$db = Yii::$app->db;
@@ -193,6 +231,10 @@ class Cart extends Component
 				'name' => $this->cartId,    
 				'value' => $this->getSerialized(),
 			]));
+		}
+		else if($this->storeIn=='localStorage'){
+			$this->data = new LocalStorage();	
+			$this->data->set($this->cartId,$this->getSerialized());
 		}
 		else if($this->storeIn=='database'){
 			$db = Yii::$app->db;
@@ -258,7 +300,7 @@ class Cart extends Component
 				}
 			}
 		}
-		else if($this->storeIn=='cookie_database'){
+		else if($this->storeIn=='cookieDatabase'){
 			if (Yii::$app->user->isGuest){
 				$this->data = Yii::$app->response->cookies;			
 				$this->data->add(new \yii\web\Cookie([    
@@ -300,10 +342,49 @@ class Cart extends Component
 				}
 			}
 		}
-		else if($this->storeIn=='session_database'){
+		else if($this->storeIn=='sessionDatabase'){
 			if (Yii::$app->user->isGuest){
 				$this->data = Yii::$app->session;
 				$this->data[$this->cartId] = $this->getSerialized();
+			}
+			else{
+				$db = Yii::$app->db;
+				$session = Yii::$app->session;
+				$cartId = str_replace('\\','',$this->cartId);
+				$user_id = Yii::$app->user->id;
+				$data = $db->createCommand("
+						SELECT * FROM ".$this->table." 
+						WHERE 
+							(user_id=".$user_id." or id = '".$session->getId()."') and
+							name='".$cartId."' and 
+							status=0 
+						LIMIT 1	
+					")           
+					->queryOne();
+				if($data){
+					$db->createCommand()->update($this->table, [    
+							'value' => $this->getSerialized(),
+						], " 
+							user_id=".$user_id." and 
+							name='".$cartId."' and 
+							status=0  ")
+						->execute();
+				}
+				else{
+					$db->createCommand()->insert($this->table, [ 
+						'id' => $session->getId(),
+						'user_id' => $user_id, 
+						'name' => $cartId,       
+						'value' => $this->getSerialized(),
+						'status' => 0
+					])->execute();
+				}
+			}
+		}
+		else if($this->storeIn=='localStorageDatabase'){
+			if (Yii::$app->user->isGuest){
+				$this->data = new LocalStorage();	
+				$this->data->set($this->cartId,$this->getSerialized());
 			}
 			else{
 				$db = Yii::$app->db;
@@ -350,7 +431,7 @@ class Cart extends Component
      */
     public function checkOut()
 	{		
-		if(in_array($this->storeIn,['database','cookie_database','session_database'])){
+		if(in_array($this->storeIn,['database','cookieDatabase','sessionDatabase', 'localStorageDatabase'])){
 			$db = Yii::$app->db;
 			$session = Yii::$app->session;
 			$cartId = str_replace('\\','',$this->cartId);

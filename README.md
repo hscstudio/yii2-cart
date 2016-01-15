@@ -2,13 +2,16 @@ Shopping cart for Yii 2
 =======================
 
 This extension is improvisation of omnilight/yii2-shopping-cart. It's add shopping cart systems for Yii framework 2.0. 
-It have feature for save to some medium, they are session (default), cookie, database, cookie_database, session_database. 
+It have feature for save to some medium, they are session (default), cookie, localStorage, database, cookieDatabase, sessionDatabase, and localStorageDatabase. 
 
-What's is the meaning of the cookie_database? 
+What's is the meaning of the cookieDatabase? 
 It's feature that save cart data to cookie if user is guest, and save to database if user is logged user. 
 
-What's is the meaning of the session_database? 
+What's is the meaning of the sessionDatabase? 
 It's feature that save cart data to session if user is guest, and save to database if user is logged user. 
+
+What's is the meaning of the localStorageDatabase? 
+It's feature that save cart data to localStorage if user is guest, and save to database if user is logged user. 
 
 Installation
 ------------
@@ -86,7 +89,7 @@ Also you can use cart as global application component:
         'cart' => [
             'class' => 'hscstudio\cart\Cart',
             'cartId' => 'my_application_cart',
-			'storeIn' => 'cookie_database', // session, cookie, database
+			'storeIn' => 'localStorageDatabase', // session, cookie, localStorage, database, cookieDatabase, sessionDatabase
 			'table' => 'cart', 
         ]
     ]
