@@ -2,10 +2,7 @@
     "name": "hscstudio/yii2-cart",
     "description": "Yii2 extension that adds shopping cart functions",
     "keywords": ["yii", "shopping cart"],
-<<<<<<< HEAD
 	"license": "MIT",
-=======
->>>>>>> 792f02facae2aa90bb616e01233dd08e8f2bb4e0
     "authors": [
         {
             "name": "Hafid Mukhlasin",
