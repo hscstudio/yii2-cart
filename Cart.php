@@ -39,6 +39,7 @@ class Cart extends Component
      * cookie cart will be automatically stored in and loaded from cookie.
 	 * database cart will be automatically stored in and loaded from database.
 	 * cookie_database cart will be automatically stored in and loaded from cookie (if guest) or database (if user).
+	 * session_database cart will be automatically stored in and loaded from session (if guest) or database (if user).
      * @var string
      */
     public $storeIn = 'session';
@@ -136,6 +137,37 @@ class Cart extends Component
 				}
 				else{
 					$this->data = Yii::$app->request->cookies;
+					if (isset($this->data[$this->cartId]))
+						$this->setSerialized($this->data[$this->cartId]);
+					
+				}				
+			}
+		}
+		else if($this->storeIn=='session_database'){
+			if (Yii::$app->user->isGuest){
+				$this->data = Yii::$app->session;
+				if (isset($this->data[$this->cartId]))
+					$this->setSerialized($this->data[$this->cartId]);
+			}
+			else{
+				$db = Yii::$app->db;
+				$session = Yii::$app->session;
+				$cartId = str_replace('\\','',$this->cartId);
+				$user_id = Yii::$app->user->id;
+				$this->data = $db->createCommand("
+						SELECT * FROM ".$this->table." 
+						WHERE 
+							(user_id=".$user_id." or id = '".$session->getId()."') and 
+							name='".$cartId."' and 
+							status=0 
+						LIMIT 1	
+					")    
+					->queryOne();
+				if($this->data){
+					$this->setSerialized($this->data['value']);
+				}
+				else{
+					$this->data = Yii::$app->session;
 					if (isset($this->data[$this->cartId]))
 						$this->setSerialized($this->data[$this->cartId]);
 					
@@ -268,6 +300,45 @@ class Cart extends Component
 				}
 			}
 		}
+		else if($this->storeIn=='session_database'){
+			if (Yii::$app->user->isGuest){
+				$this->data = Yii::$app->session;
+				$this->data[$this->cartId] = $this->getSerialized();
+			}
+			else{
+				$db = Yii::$app->db;
+				$session = Yii::$app->session;
+				$cartId = str_replace('\\','',$this->cartId);
+				$user_id = Yii::$app->user->id;
+				$data = $db->createCommand("
+						SELECT * FROM ".$this->table." 
+						WHERE 
+							(user_id=".$user_id." or id = '".$session->getId()."') and
+							name='".$cartId."' and 
+							status=0 
+						LIMIT 1	
+					")           
+					->queryOne();
+				if($data){
+					$db->createCommand()->update($this->table, [    
+							'value' => $this->getSerialized(),
+						], " 
+							user_id=".$user_id." and 
+							name='".$cartId."' and 
+							status=0  ")
+						->execute();
+				}
+				else{
+					$db->createCommand()->insert($this->table, [ 
+						'id' => $session->getId(),
+						'user_id' => $user_id, 
+						'name' => $cartId,       
+						'value' => $this->getSerialized(),
+						'status' => 0
+					])->execute();
+				}
+			}
+		}
 		else{
 			$this->data = Yii::$app->session;
 			$this->data[$this->cartId] = $this->getSerialized();
@@ -279,7 +350,7 @@ class Cart extends Component
      */
     public function checkOut()
 	{		
-		if(in_array($this->storeIn,['database','cookie_database'])){
+		if(in_array($this->storeIn,['database','cookie_database','session_database'])){
 			$db = Yii::$app->db;
 			$session = Yii::$app->session;
 			$cartId = str_replace('\\','',$this->cartId);
