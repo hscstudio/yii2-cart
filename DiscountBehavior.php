@@ -7,15 +7,15 @@ use yii\base\Behavior;
 
 /**
  * Class DiscountBehavior
- * @package \yz\shoppingcart
+ * @package \hscsstudio\cart
  */
 class DiscountBehavior extends Behavior
 {
     public function events()
     {
         return [
-            ShoppingCart::EVENT_COST_CALCULATION => 'onCostCalculation',
-            CartPositionInterface::EVENT_COST_CALCULATION => 'onCostCalculation',
+            Cart::EVENT_COST_CALCULATION => 'onCostCalculation',
+            ItemInterface::EVENT_COST_CALCULATION => 'onCostCalculation',
         ];
     }
 

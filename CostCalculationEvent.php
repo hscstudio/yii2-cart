@@ -7,12 +7,12 @@ use yii\base\Event;
 
 /**
  * Class CostCalculationEvent
- * @package \yz\shoppingcart
+ * @package \hscsstudio\cart
  */
 class CostCalculationEvent extends Event
 {
     /**
-     * Base cost of the cart or position, that was calculated without discount
+     * Base cost of the cart or item, that was calculated without discount
      * @var int
      */
     public $baseCost;

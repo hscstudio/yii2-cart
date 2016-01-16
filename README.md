@@ -50,9 +50,9 @@ How to use
 
 In your model:
 ```php
-class Product extends ActiveRecord implements CartPositionInterface
+class Product extends ActiveRecord implements ItemInterface
 {
-    use CartPositionTrait;
+    use ItemTrait;
 
     public function getPrice()
     {
@@ -68,17 +68,45 @@ class Product extends ActiveRecord implements CartPositionInterface
 
 In your controller:
 ```php
-public function actionAddToCart($id)
-{
-    $cart = new Cart();
-
-    $model = Product::findOne($id);
-    if ($model) {
-        $cart->put($model, 1);
-        return $this->redirect(['cart-view']);
+	public function actionCreate($id)
+    {
+        $product = Product::findOne($id);
+        if ($product) {
+            \Yii::$app->cart->create($product);
+            $this->redirect(['index']);
+        }
     }
-    throw new NotFoundHttpException();
-}
+    public function actionIndex()
+    {
+        $cart = \Yii::$app->cart;
+        $products = $cart->getItems();
+        $total = $cart->getCost();
+        return $this->render('index', [
+            'products' => $products,
+            'total' => $total,
+        ]);
+    }
+    public function actionDelete($id)
+    {
+        $product = Product::findOne($id);
+        if ($product) {
+            \Yii::$app->cart->delete($product);
+            $this->redirect(['index']);
+        }
+    }
+    public function actionUpdate($id, $quantity)
+    {
+        $product = Product::findOne($id);
+        if ($product) {
+            \Yii::$app->cart->update($product, $quantity);
+            $this->redirect(['index']);
+        }
+    }
+	
+	public function actionCheckout(){
+		\Yii::$app->cart->checkOut(false);
+		$this->redirect(['index']);
+	}
 ```
 
 Also you can use cart as global application component:
@@ -89,17 +117,52 @@ Also you can use cart as global application component:
         'cart' => [
             'class' => 'hscstudio\cart\Cart',
             'cartId' => 'my_application_cart',
-			'storeIn' => 'localStorageDatabase', // session, cookie, localStorage, database, cookieDatabase, sessionDatabase
+			'storageClass' => 'hscstudio\cart\LocalDbStorage',
 			'table' => 'cart', 
         ]
     ]
 ]
 ```
 
+Possible values of storageClass are 
+- hscstudio\cart\CookieStorage
+- hscstudio\cart\SessionStorage
+- hscstudio\cart\LocalStorage
+- hscstudio\cart\CookieDbStorage
+- hscstudio\cart\SessionDbStorage
+
+Or You can create and use Your own storageClass, it's should extends abstract class of hscstudio\cart\Storage.
+It is look like :
+```
+<?php
+
+namespace app\foo;
+
+use hscstudio\cart\Storage;
+
+class ExampleStorage extends Storage
+{
+	public function read(Cart $cart)
+	{
+		// read cart data
+	}
+	
+	public function write(Cart $cart)
+	{
+		// write cart data
+	}
+	
+	public function lock($drop, Cart $cart)
+	{
+		// lock cart data, only for db
+	}
+}
+```
+
 And use it in the following way:
 
 ```php
-\Yii::$app->cart->put($cartPosition, 1);
+\Yii::$app->cart->create($product, 1);
 ```
 
 In order to get number of items in the cart:
@@ -118,88 +181,16 @@ If user have finished, and do checkout, so wen use following code
 
 ```php
 \Yii::$app->cart->removeAll(); // will remove data
+// or 
+\Yii::$app->cart->checkOut(); // will remove data
 // or
-\Yii::$app->cart->removeAll(false); // will keep data, only update status to 1 and regerenerate session ID
-```
-
-If the original model that you want to use as cart position is too heavy to be stored in the session, you
-can create a separate class implementing CartPositionInterface, and original model can implement
-CartPositionProviderInterface:
-
-```php
-// app\models\Product.php
-
-class Product extends ActiveRecord implements CartPositionProviderInterface
-{
-    public function getCartPosition()
-    {
-        return \Yii::createObject([
-            'class' => 'app\models\ProductCartPosition',
-            'id' => $this->id,
-        ]);
-    }
-}
-
-// app\models\ProductCartPosition.php
-
-class ProductCartPosition extends Object implements CartPositionInterface
-{
-    /**
-     * @var Product
-     */
-    protected $_product;
-
-    public $id;
-
-    public function getId()
-    {
-        return $this->id;
-    }
-
-    public function getPrice()
-    {
-        return $this->getProduct()->price;
-    }
-
-    /**
-     * @return Product
-    */
-    public function getProduct()
-    {
-        if ($this->_product === null) {
-            $this->_product = Product::findOne($this->id);
-        }
-        return $this->_product;
-    }
-}
-```
-
-This way gives us ability to create separate cart positions for the same product, that differs only on some property,
-for example price or color:
-
-```php
-// app\models\ProductCartPosition.php
-
-class ProductCartPosition extends Object implements CartPositionInterface
-{
-    public $id;
-    public $price;
-    public $color;
-
-    //...
-    public function getId()
-    {
-        return md5(serialize([$this->id, $this->price, $this->color]));
-    }
-
-    //...
-}
+\Yii::$app->cart->checkOut(false); // will keep data, only update status to 1 and regenerate session ID
 ```
 
 Using discounts
 ---------------
 
-Discounts are implemented as behaviors that could attached to the cart or it's positions. To use them, follow this steps:
+Discounts are implemented as behaviors that could attached to the cart or it's items. To use them, follow this steps:
 
 1. Define discount class as a subclass of hscstudio\cart\DiscountBehavior
 ```php
@@ -224,14 +215,14 @@ class MyDiscount extends DiscountBehavior
 $cart->attachBehavior('myDiscount', ['class' => 'app\components\MyDiscount']);
 ```
 
-If discount is suitable not for the whole cart, but for the individual positions, than it is possible to attach
+If discount is suitable not for the whole cart, but for the individual item, than it is possible to attach
 discount to the cart position itself:
 
 ```
-$cart->getPositionById($positionId)->attachBehavior('myDiscount', ['class' => 'app\components\MyDiscount']);
+$cart->getItemById($itemId)->attachBehavior('myDiscount', ['class' => 'app\components\MyDiscount']);
 ```
 
-Note, that the same behavior could be used for both cart and position classes.
+Note, that the same behavior could be used for both cart and item classes.
 
 3. To get total cost with discount applied:
 
@@ -241,7 +232,7 @@ $total = \Yii::$app->cart->getCost(true);
 
 4. During the calculation the following events are triggered: 
 - `Cart::EVENT_COST_CALCULATION` once per calculation.
-- `CartPositionInterface::EVENT_COST_CALCULATION` for each position in the cart.
+- `ItemInterface::EVENT_COST_CALCULATION` for each item in the cart.
  
 You can also subscribe on this events to perform discount calculation:
 

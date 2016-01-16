@@ -10,10 +10,10 @@ use yii\base\Event;
 class CartActionEvent extends Event
 {
     const ACTION_UPDATE = 'update';
-    const ACTION_POSITION_PUT = 'positionPut';
+    const ACTION_ITEM_PUT = 'itemPut';
     const ACTION_BEFORE_REMOVE = 'beforeRemove';
     const ACTION_REMOVE_ALL = 'removeAll';
-    const ACTION_SET_POSITIONS = 'setPositions';
+    const ACTION_SET_ITEMS = 'setItems';
 
     /**
      * Name of the action taken on the cart
@@ -21,8 +21,8 @@ class CartActionEvent extends Event
      */
     public $action;
     /**
-     * Position of the cart that was affected. Could be null if action deals with all positions of the cart
-     * @var CartPositionInterface
+     * Item of the cart that was affected. Could be null if action deals with all items of the cart
+     * @var ItemInterface
      */
-    public $position;
+    public $item;
 }

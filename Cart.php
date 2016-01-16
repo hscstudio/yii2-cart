@@ -13,24 +13,24 @@ use hscstudio\cart\LocalStorage;
 
 /**
  * Class Cart
- * @property CartPositionInterface[] $positions
- * @property int $count Total count of positions in the cart
- * @property int $cost Total cost of positions in the cart
+ * @property ItemInterface[] $items
+ * @property int $count Total count of items in the cart
+ * @property int $cost Total cost of items in the cart
  * @property bool $isEmpty Returns true if cart is empty
  * @property string $hash Returns hash (md5) of the current cart, that is uniq to the current combination
- * of positions, quantities and costs
+ * of items, quantities and costs
  * @property string $serialized Get/set serialized content of the cart
  * @package \hscstudio\cart
  */
 class Cart extends Component
 {
-    /** Triggered on position put */
-    const EVENT_POSITION_PUT = 'putPosition';
-    /** Triggered on position update */
-    const EVENT_POSITION_UPDATE = 'updatePosition';
-    /** Triggered on after position remove */
-    const EVENT_BEFORE_POSITION_REMOVE = 'removePosition';
-    /** Triggered on any cart change: add, update, delete position */
+    /** Triggered on item put */
+    const EVENT_ITEM_PUT = 'putItem';
+    /** Triggered on item update */
+    const EVENT_ITEM_UPDATE = 'updateItem';
+    /** Triggered on after item remove */
+    const EVENT_BEFORE_ITEM_REMOVE = 'removeItem';
+    /** Triggered on any cart change: add, update, delete item */
     const EVENT_CART_CHANGE = 'cartChange';
     /** Triggered on after cart cost calculation */
     const EVENT_COST_CALCULATION = 'costCalculation';
@@ -40,605 +40,213 @@ class Cart extends Component
      * cookie cart will be automatically stored in and loaded from cookie.
      * localStorage cart will be automatically stored in and loaded from localStorage.
 	 * database cart will be automatically stored in and loaded from database.
-	 * cookie_database cart will be automatically stored in and loaded from cookie (if guest) or database (if user).
-	 * session_database cart will be automatically stored in and loaded from session (if guest) or database (if user).
+	 * cookieDatabase cart will be automatically stored in and loaded from cookie (if guest) or database (if user).
+	 * sessionDatabase cart will be automatically stored in and loaded from session (if guest) or database (if user).
      * @var string
      */
-    public $storeIn = 'session';
+    //public $storeIn = 'session';
+	
+    public $storageClass = 'hscstudio\cart\SessionStorage';
+	
+	/**
+     * @var storage
+     */
+    protected $storage;
     /**
      * Data component
      * @var string|data
      */
-    protected $data = 'data';
+    //protected $data = 'data';
 	/**
      * Table name for db
      * @var string|table
      */
     public $table = 'cart';
     /**
-     * Shopping cart ID to support multiple carts
+     * Shopping ID to support multiple carts
      * @var string
      */
-    public $cartId = __CLASS__;
+    public $id = 'cart1';
     /**
-     * @var CartPositionInterface[]
+     * @var ItemInterface[]
      */
-    protected $_positions = [];
+    public $items = [];
+	/**
+     * @var sessionId
+     */
+	public $sessionId;
 
     public function init()
     {
-        $this->loadData();
+        $this->sessionId = Yii::$app->session->getId();
+		$this->storage = new $this->storageClass();		
+		$this->load();
     }
 
     /**
      * Loads cart from data
      */
-    public function loadData()
+    public function load()
     {
-		if($this->storeIn=='cookie'){
-			$this->data = Yii::$app->request->cookies;
-			if (isset($this->data[$this->cartId]))
-				$this->setSerialized($this->data[$this->cartId]);
-		}
-		else if($this->storeIn=='localStorage'){
-			$this->data = new LocalStorage();			
-			if ($this->data->has($this->cartId))
-				$this->setSerialized($this->data->get($this->cartId));
-		}
-		else if($this->storeIn=='database'){
-			$db = Yii::$app->db;
-			$session = Yii::$app->session;
-			$cartId = str_replace('\\','',$this->cartId);
-			if (Yii::$app->user->isGuest){
-				$this->data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							id = '".$session->getId()."' and 
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")    
-					->queryOne();
-				if($this->data){
-					$this->setSerialized($this->data['value']);
-				}
-			}
-			else{
-				$user_id = Yii::$app->user->id;
-				$this->data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and 
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")    
-					->queryOne();
-				if($this->data){
-					$this->setSerialized($this->data['value']);
-				}
-			}
-		}
-		else if($this->storeIn=='cookieDatabase'){
-			if (Yii::$app->user->isGuest){
-				$this->data = Yii::$app->request->cookies;
-				if (isset($this->data[$this->cartId]))
-					$this->setSerialized($this->data[$this->cartId]);
-			}
-			else{
-				$db = Yii::$app->db;
-				$session = Yii::$app->session;
-				$cartId = str_replace('\\','',$this->cartId);
-				$user_id = Yii::$app->user->id;
-				$this->data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and 
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")    
-					->queryOne();
-				if($this->data){
-					$this->setSerialized($this->data['value']);
-				}
-				else{
-					$this->data = Yii::$app->request->cookies;
-					if (isset($this->data[$this->cartId]))
-						$this->setSerialized($this->data[$this->cartId]);
-					
-				}				
-			}
-		}
-		else if($this->storeIn=='sessionDatabase'){
-			if (Yii::$app->user->isGuest){
-				$this->data = Yii::$app->session;
-				if (isset($this->data[$this->cartId]))
-					$this->setSerialized($this->data[$this->cartId]);
-			}
-			else{
-				$db = Yii::$app->db;
-				$session = Yii::$app->session;
-				$cartId = str_replace('\\','',$this->cartId);
-				$user_id = Yii::$app->user->id;
-				$this->data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and 
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")    
-					->queryOne();
-				if($this->data){
-					$this->setSerialized($this->data['value']);
-				}
-				else{
-					$this->data = Yii::$app->session;
-					if (isset($this->data[$this->cartId]))
-						$this->setSerialized($this->data[$this->cartId]);
-					
-				}				
-			}
-		}
-		else if($this->storeIn=='localStorageDatabase'){
-			if (Yii::$app->user->isGuest){
-				$this->data = new LocalStorage();			
-				if ($this->data->has($this->cartId))
-					$this->setSerialized($this->data->get($this->cartId));
-			}
-			else{
-				$db = Yii::$app->db;
-				$session = Yii::$app->session;
-				$cartId = str_replace('\\','',$this->cartId);
-				$user_id = Yii::$app->user->id;
-				$this->data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and 
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")    
-					->queryOne();
-				if($this->data){
-					$this->setSerialized($this->data['value']);
-				}
-				else{
-					$this->data = Yii::$app->session;
-					if (isset($this->data[$this->cartId]))
-						$this->setSerialized($this->data[$this->cartId]);
-					
-				}				
-			}
-		}
-		else{
-			$this->data = Yii::$app->session;
-			if (isset($this->data[$this->cartId]))
-				$this->setSerialized($this->data[$this->cartId]);
-		}
-        
-    }
+		$this->storage->read($this);	
+	}
 
     /**
      * Saves cart to the data
      */
-    public function saveData()
+    public function save()
     {
-		if($this->storeIn=='cookie'){
-			$this->data = Yii::$app->response->cookies;			
-			$this->data->add(new \yii\web\Cookie([    
-				'name' => $this->cartId,    
-				'value' => $this->getSerialized(),
-			]));
-		}
-		else if($this->storeIn=='localStorage'){
-			$this->data = new LocalStorage();	
-			$this->data->set($this->cartId,$this->getSerialized());
-		}
-		else if($this->storeIn=='database'){
-			$db = Yii::$app->db;
-			$session = Yii::$app->session;
-			$cartId = str_replace('\\','',$this->cartId);
-			//$session->destroy();			
-			if (Yii::$app->user->isGuest){
-				$data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							'".$session->getId()."' and
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")           
-					->queryOne();
-				if($data){
-					$db->createCommand()->update($this->table, [  
-						'value' => $this->getSerialized(),
-					], "
-						id = '".$session->getId()."' and 
-						name='".$cartId."' and 
-						status=0 
-					")->execute();
-				}
-				else{					
-					$db->createCommand()->insert($this->table, [ 
-						'id' => $session->getId(),
-						'name' => $cartId,    
-						'value' => $this->getSerialized(),
-						'status' => 0
-					])->execute();
-				}
-			}
-			else{
-				$user_id = Yii::$app->user->id;
-				$data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")           
-					->queryOne();
-				if($data){
-					$db->createCommand()->update($this->table, [    
-							'value' => $this->getSerialized(),
-						], " 
-							user_id=".$user_id." and 
-							name='".$cartId."' and 
-							status=0  ")
-						->execute();
-				}
-				else{
-					$db->createCommand()->insert($this->table, [ 
-						'id' => $session->getId(),
-						'user_id' => $user_id, 
-						'name' => $cartId,       
-						'value' => $this->getSerialized(),
-						'status' => 0
-					])->execute();
-				}
-			}
-		}
-		else if($this->storeIn=='cookieDatabase'){
-			if (Yii::$app->user->isGuest){
-				$this->data = Yii::$app->response->cookies;			
-				$this->data->add(new \yii\web\Cookie([    
-					'name' => $this->cartId,    
-					'value' => $this->getSerialized(),
-				]));
-			}
-			else{
-				$db = Yii::$app->db;
-				$session = Yii::$app->session;
-				$cartId = str_replace('\\','',$this->cartId);
-				$user_id = Yii::$app->user->id;
-				$data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")           
-					->queryOne();
-				if($data){
-					$db->createCommand()->update($this->table, [    
-							'value' => $this->getSerialized(),
-						], " 
-							user_id=".$user_id." and 
-							name='".$cartId."' and 
-							status=0  ")
-						->execute();
-				}
-				else{
-					$db->createCommand()->insert($this->table, [ 
-						'id' => $session->getId(),
-						'user_id' => $user_id, 
-						'name' => $cartId,       
-						'value' => $this->getSerialized(),
-						'status' => 0
-					])->execute();
-				}
-			}
-		}
-		else if($this->storeIn=='sessionDatabase'){
-			if (Yii::$app->user->isGuest){
-				$this->data = Yii::$app->session;
-				$this->data[$this->cartId] = $this->getSerialized();
-			}
-			else{
-				$db = Yii::$app->db;
-				$session = Yii::$app->session;
-				$cartId = str_replace('\\','',$this->cartId);
-				$user_id = Yii::$app->user->id;
-				$data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")           
-					->queryOne();
-				if($data){
-					$db->createCommand()->update($this->table, [    
-							'value' => $this->getSerialized(),
-						], " 
-							user_id=".$user_id." and 
-							name='".$cartId."' and 
-							status=0  ")
-						->execute();
-				}
-				else{
-					$db->createCommand()->insert($this->table, [ 
-						'id' => $session->getId(),
-						'user_id' => $user_id, 
-						'name' => $cartId,       
-						'value' => $this->getSerialized(),
-						'status' => 0
-					])->execute();
-				}
-			}
-		}
-		else if($this->storeIn=='localStorageDatabase'){
-			if (Yii::$app->user->isGuest){
-				$this->data = new LocalStorage();	
-				$this->data->set($this->cartId,$this->getSerialized());
-			}
-			else{
-				$db = Yii::$app->db;
-				$session = Yii::$app->session;
-				$cartId = str_replace('\\','',$this->cartId);
-				$user_id = Yii::$app->user->id;
-				$data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")           
-					->queryOne();
-				if($data){
-					$db->createCommand()->update($this->table, [    
-							'value' => $this->getSerialized(),
-						], " 
-							user_id=".$user_id." and 
-							name='".$cartId."' and 
-							status=0  ")
-						->execute();
-				}
-				else{
-					$db->createCommand()->insert($this->table, [ 
-						'id' => $session->getId(),
-						'user_id' => $user_id, 
-						'name' => $cartId,       
-						'value' => $this->getSerialized(),
-						'status' => 0
-					])->execute();
-				}
-			}
-		}
-		else{
-			$this->data = Yii::$app->session;
-			$this->data[$this->cartId] = $this->getSerialized();
-		}
+		$this->storage->write($this);
     }
 	
 	/**
      * Checkout cart
      */
-    public function checkOut()
+    public function checkOut($drop)
 	{		
-		if(in_array($this->storeIn,['database','cookieDatabase','sessionDatabase', 'localStorageDatabase'])){
-			$db = Yii::$app->db;
-			$session = Yii::$app->session;
-			$cartId = str_replace('\\','',$this->cartId);
-			if (Yii::$app->user->isGuest){
-				$data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(id = '".$session->getId()."') and
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")           
-					->queryOne();
-			}
-			else{
-				$user_id = Yii::$app->user->id;
-				$data = $db->createCommand("
-						SELECT * FROM ".$this->table." 
-						WHERE 
-							(user_id=".$user_id." or id = '".$session->getId()."') and
-							name='".$cartId."' and 
-							status=0 
-						LIMIT 1	
-					")           
-					->queryOne();
-			}
-			
-			if($data){
-				if($drop){
-					$db->createCommand()->delete($this->table, " 
-							user_id=".$user_id." and 
-							name='".$cartId."' and 
-							status=0  ")
-						->execute();
-				}
-				else{
-					$db->createCommand()->update($this->table, [    
-							'status' => 1,
-						], " 
-							user_id=".$user_id." and 
-							name='".$cartId."' and 
-							status=0  ")
-						->execute();
-					$session->regenerateID(true);
-				}
-				
-			}
+		if(!empty($this->storage->db)){
+			$this->storage->lock($drop, $this);	
 		}
+		else{
+			$this->deleteAll();
+		}		
+		
 	}
-	
-    /**
-     * Sets cart from serialized string
-     * @param string $serialized
-     */
-    public function setSerialized($serialized)
-    {
-        $this->_positions = unserialize($serialized);
-    }
-
-    /**
-     * @param CartPositionInterface $position
+    
+	/**
+     * @param ItemInterface $item
      * @param int $quantity
      */
-    public function put($position, $quantity = 1)
+    public function create($item, $quantity = 1)
     {
-        if (isset($this->_positions[$position->getId()])) {
-            $this->_positions[$position->getId()]->setQuantity(
-                $this->_positions[$position->getId()]->getQuantity() + $quantity);
+        if (isset($this->items[$item->getId()])) {
+            $this->items[$item->getId()]->setQuantity(
+                $this->items[$item->getId()]->getQuantity() + $quantity);
         } else {
-            $position->setQuantity($quantity);
-            $this->_positions[$position->getId()] = $position;
+            $item->setQuantity($quantity);
+            $this->items[$item->getId()] = $item;
         }
-        $this->trigger(self::EVENT_POSITION_PUT, new CartActionEvent([
-            'action' => CartActionEvent::ACTION_POSITION_PUT,
-            'position' => $this->_positions[$position->getId()],
+        $this->trigger(self::EVENT_ITEM_PUT, new CartActionEvent([
+            'action' => CartActionEvent::ACTION_ITEM_PUT,
+            'item' => $this->items[$item->getId()],
         ]));
         $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
-            'action' => CartActionEvent::ACTION_POSITION_PUT,
-            'position' => $this->_positions[$position->getId()],
+            'action' => CartActionEvent::ACTION_ITEM_PUT,
+            'item' => $this->items[$item->getId()],
         ]));
-        $this->saveData();
+        $this->save();
     }
-
+	
     /**
-     * Returns cart positions as serialized items
-     * @return string
-     */
-    public function getSerialized()
-    {
-        return serialize($this->_positions);
-    }
-
-    /**
-     * @param CartPositionInterface $position
+     * @param ItemInterface $item
      * @param int $quantity
      */
-    public function update($position, $quantity)
+    public function update($item, $quantity)
     {
         if ($quantity <= 0) {
-            $this->remove($position);
+            $this->delete($item);
             return;
         }
 
-        if (isset($this->_positions[$position->getId()])) {
-            $this->_positions[$position->getId()]->setQuantity($quantity);
+        if (isset($this->items[$item->getId()])) {
+            $this->items[$item->getId()]->setQuantity($quantity);
         } else {
-            $position->setQuantity($quantity);
-            $this->_positions[$position->getId()] = $position;
+            $item->setQuantity($quantity);
+            $this->items[$item->getId()] = $item;
         }
-        $this->trigger(self::EVENT_POSITION_UPDATE, new CartActionEvent([
+        $this->trigger(self::EVENT_ITEM_UPDATE, new CartActionEvent([
             'action' => CartActionEvent::ACTION_UPDATE,
-            'position' => $this->_positions[$position->getId()],
+            'item' => $this->items[$item->getId()],
         ]));
         $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
             'action' => CartActionEvent::ACTION_UPDATE,
-            'position' => $this->_positions[$position->getId()],
+            'item' => $this->items[$item->getId()],
         ]));
-        $this->saveData();
+        $this->save();
     }
 
     /**
-     * Removes position from the cart
-     * @param CartPositionInterface $position
+     * Delete item from the cart
+     * @param ItemInterface $item
      */
-    public function remove($position)
+    public function delete($item)
     {
-        $this->removeById($position->getId());
+        $this->deleteById($item->getId());
     }
 
     /**
-     * Removes position from the cart by ID
+     * Delete items from the cart by ID
      * @param string $id
      */
-    public function removeById($id)
+    public function deleteById($id)
     {
-        $this->trigger(self::EVENT_BEFORE_POSITION_REMOVE, new CartActionEvent([
+        $this->trigger(self::EVENT_BEFORE_ITEM_REMOVE, new CartActionEvent([
             'action' => CartActionEvent::ACTION_BEFORE_REMOVE,
-            'position' => $this->_positions[$id],
+            'item' => $this->items[$id],
         ]));
         $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
             'action' => CartActionEvent::ACTION_BEFORE_REMOVE,
-            'position' => $this->_positions[$id],
+            'item' => $this->items[$id],
         ]));
-        unset($this->_positions[$id]);
-        $this->saveData();
+        unset($this->items[$id]);
+        $this->save();
     }
 
     /**
-     * Remove all positions
+     * Delete all items
      */
-    public function removeAll($delete=true)
+    public function deleteAll()
     {
-        $this->_positions = [];
+        $this->items = [];
         $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
             'action' => CartActionEvent::ACTION_REMOVE_ALL,
         ]));
-		if($delete){
-			$this->saveData();			
-		}
-		else{	
-			$this->checkOut();
-		}
+		$this->save();
     }
 
     /**
-     * Returns position by it's id. Null is returned if position was not found
+     * Returns item by it's id. Null is returned if item was not found
      * @param string $id
-     * @return CartPositionInterface|null
+     * @return ItemInterface|null
      */
-    public function getPositionById($id)
+    public function getItemById($id)
     {
-        if ($this->hasPosition($id))
-            return $this->_positions[$id];
+        if ($this->hasItem($id))
+            return $this->items[$id];
         else
             return null;
     }
 
     /**
-     * Checks whether cart position exists or not
+     * Checks whether cart item exists or not
      * @param string $id
      * @return bool
      */
-    public function hasPosition($id)
+    public function hasItem($id)
     {
-        return isset($this->_positions[$id]);
+        return isset($this->items[$id]);
     }
 
     /**
-     * @return CartPositionInterface[]
+     * @return ItemInterface[]
      */
-    public function getPositions()
+    public function getItems()
     {
-        return $this->_positions;
+        return $this->items;
     }
 
     /**
-     * @param CartPositionInterface[] $positions
+     * @param ItemInterface[] $items
      */
-    public function setPositions($positions)
+    public function setItems($items)
     {
-        $this->_positions = array_filter($positions, function (CartPositionInterface $position) {
-            return $position->quantity > 0;
+        $this->items = array_filter($items, function (ItemInterface $item) {
+            return $item->quantity > 0;
         });
         $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
-            'action' => CartActionEvent::ACTION_SET_POSITIONS,
+            'action' => CartActionEvent::ACTION_SET_ITEMS,
         ]));
-        $this->saveData();
+        $this->save();
     }
 
     /**
@@ -647,7 +255,7 @@ class Cart extends Component
      */
     public function getIsEmpty()
     {
-        return count($this->_positions) == 0;
+        return count($this->items) == 0;
     }
 
     /**
@@ -656,21 +264,21 @@ class Cart extends Component
     public function getCount()
     {
         $count = 0;
-        foreach ($this->_positions as $position)
-            $count += $position->getQuantity();
+        foreach ($this->items as $item)
+            $count += $item->getQuantity();
         return $count;
     }
 
     /**
-     * Return full cart cost as a sum of the individual positions costs
+     * Return full cart cost as a sum of the individual items costs
      * @param $withDiscount
      * @return int
      */
     public function getCost($withDiscount = false)
     {
         $cost = 0;
-        foreach ($this->_positions as $position) {
-            $cost += $position->getCost($withDiscount);
+        foreach ($this->items as $item) {
+            $cost += $item->getCost($withDiscount);
         }
         $costEvent = new CostCalculationEvent([
             'baseCost' => $cost,
@@ -683,15 +291,15 @@ class Cart extends Component
 
     /**
      * Returns hash (md5) of the current cart, that is unique to the current combination
-     * of positions, quantities and costs. This helps us fast compare if two carts are the same, or not, also
+     * of items, quantities and costs. This helps us fast compare if two carts are the same, or not, also
      * we can detect if cart is changed (comparing hash to the one's saved somewhere)
      * @return string
      */
     public function getHash()
     {
         $data = [];
-        foreach ($this->positions as $position) {
-            $data[] = [$position->getId(), $position->getQuantity(), $position->getWeight(), $position->getPrice()];
+        foreach ($this->items as $item) {
+            $data[] = [$item->getId(), $item->getQuantity(), $item->getWeight(), $item->getPrice()];
         }
         return md5(serialize($data));
     }
