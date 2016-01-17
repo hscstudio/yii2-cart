@@ -4,104 +4,147 @@
  * @copyright Copyright (c) 2016 HafidMukhlasin.com
  * @license http://www.yiiframework.com/license/
  */
- 
+
 namespace hscstudio\cart;
+
+use Yii;
+use yii\di\Instance;
+use yii\db\Query;
 
 /**
  * DatabaseStorage is extended from Storage Class
- * 
+ *
  * It's specialty for handling read and write cart data into database
  *
  * Usage:
  * Configuration in block component look like this
- *		'cart' => [
- *			'class' => 'hscstudio\cart\Cart',
- *			'storage' => [
- *				'class' => 'hscstudio\cart\DatabaseStorage',
- *				'table'	=> 'cart',
- *			]
- *		],
+ *        'cart' => [
+ *            'class' => 'hscstudio\cart\Cart',
+ *            'storage' => [
+ *                'class' => 'hscstudio\cart\DatabaseStorage',
+ *                'table'    => 'cart',
+ *            ]
+ *        ],
  *
  * @author Hafid Mukhlasin <hafidmukhlasin@gmail.com>
  * @since 1.0
  *
-*/
-
+ */
 class DatabaseStorage extends Storage
 {
-	protected $db;
-	
+	public $db = 'db';
+
 	public $table = 'cart';
-	
+
+	/**
+	 *
+	 */
 	public function init()
 	{
-		$this->db = \Yii::$app->db;
+		parent::init();
+		$this->db = Instance::ensure($this->db, 'yii\db\Connection');
 	}
-	
+
 	public function read(Cart $cart)
-	{	
-		if($data=$this->select($cart)){
-			$this->unserialize($data['value'],$cart);
+	{
+		if ($data = $this->select($cart)) {
+			$this->unserialize($data['value'], $cart);
 		}
 	}
-	
+
 	public function write(Cart $cart)
 	{
-		if($this->select($cart)){
+		if ($this->select($cart)) {
 			$this->update($cart);
-		}
-		else{
+		} else {
 			$this->insert($cart);
-		}		
+		}
 	}
-	
+
 	public function lock($drop, Cart $cart)
 	{
-		if($data=$this->select($cart)){
-			if($drop){
-				$qry = $this->query("delete", 
-					"(user_id	= ".\Yii::$app->user->id." or id = '".\Yii::$app->session->getId()."') and 
-					 name	 	= '".$cartId."' and 
-					 status 		= 0");
+		if ($data = $this->select($cart)) {
+			if ($drop) {
+				$this->db->createCommand()->update($this->table, [
+						'and',
+						['or',
+							['user_id' => Yii::$app->user->id],
+							['id' => Yii::$app->session->getId()],
+						],
+						['name' 	=> $cart->id],
+						['status' 	=> 0]
+					]
+				)->execute();
+			} else {
+				$this->db->createCommand()->update($this->table, [
+						'status' => 1
+					],
+					[
+						'and',
+						['or',
+							['user_id' => Yii::$app->user->id],
+							['id' => Yii::$app->session->getId()],
+						],
+						['name' 	=> $cart->id],
+						['status' 	=> 0]
+					]
+				)->execute();
+				Yii::$app->session->regenerateID(true);
 			}
-			else{
-				$qry = $this->query("update", 
-					"(user_id	= ".\Yii::$app->user->id." or id = '".\Yii::$app->session->getId()."') and 
-					 name	 	= '".$cartId."' and 
-					 status 		= 0",
-					"status 	= 1");				
-				$this->db->createCommand($qry)->execute();
-				\Yii::$app->session->regenerateID(true);
-			}
-			$this->db->createCommand($qry)->execute();			
+			$this->db->createCommand($qry)->execute();
 		}
 	}
-	
-	public function select(Cart $cart){
-		$qry = "SELECT * FROM  ".$this->table." WHERE 
-					 (user_id	= ".\Yii::$app->user->id." or id = '".\Yii::$app->session->getId()."') and 
-					  name	 	= '".$cart->id."' and 
-					  status 	= 0";
-		return $this->db->createCommand($qry)->queryOne();
+
+	/**
+	 * @param Cart $cart
+	 * @return array|bool
+	 */
+	public function select(Cart $cart)
+	{
+		return (new Query())
+			->select('*')
+			->from($this->table)
+			->where(['or', 'user_id = ' . Yii::$app->user->id, 'id = \'' . Yii::$app->session->getId() . '\''])
+			->andWhere([
+				'name' => $cart->id,
+				'status' => 0,
+			])
+			->orderBy(['id' => SORT_DESC])
+			->limit(1)
+			->one($this->db);
 	}
-	
-	public function insert(Cart $cart){
+
+	/**
+	 * @param Cart $cart
+	 */
+	public function insert(Cart $cart)
+	{
 		$this->db->createCommand()->insert($this->table, [
-				"id"		=>	\Yii::$app->session->getId(),
-				"user_id"	=>	\Yii::$app->user->id,
-				"name"		=> 	$cart->id,
-				"value"		=>	$this->serialize($cart),
-				"status"	=> 	0,
-				])->execute();			
+			'id' => Yii::$app->session->getId(),
+			'user_id' => Yii::$app->user->id,
+			'name' => $cart->id,
+			'value' => $this->serialize($cart),
+			'status' => 0,
+		])->execute();
 	}
-	
-	public function update(Cart $cart){				
+
+	/**
+	 * @param Cart $cart
+	 */
+	public function update(Cart $cart)
+	{
 		$this->db->createCommand()->update($this->table, [
-					'value' => $this->serialize($cart)
-				], 
-				"(user_id	= ".\Yii::$app->user->id." or id = '".\Yii::$app->session->getId()."') and 
-				  name		= '".$cart->id."' and 
-				  status 	= 0")
-				->execute();
+				'value' => $this->serialize($cart)
+			],
+			[
+				'and',
+				['or',
+					['user_id' => Yii::$app->user->id],
+					['id' => Yii::$app->session->getId()],
+				],
+				['name' 	=> $cart->id],
+				['status' 	=> 0]
+			]
+		)->execute();
 	}
 }

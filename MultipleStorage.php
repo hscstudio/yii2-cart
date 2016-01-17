@@ -39,63 +39,87 @@ use yii\di\Instance;
 
 class MultipleStorage extends Storage
 {
+	/**
+	 * Array $storage
+	 */
 	public $storages = [];
 
+	/**
+	 *
+	 */
 	public function init()
 	{
+		parent::init();
 		if (empty($this->storages)) {
 			$this->storages = [
 				['class' => SessionStorage::class],
-				['class' => DbStorage::class],
+				['class' => DatabaseStorage::class],
 			];
 		}
 		
 		$this->storages = array_map(function ($storage) {
 			return Instance::ensure($storage, Storage::class);
 		}, $this->storages);
-		
-		$session = \Yii::$app->session;
-		if(!$session->has('needSynchronize'))
-			$session->set('needSynchronize',\Yii::$app->user->isGuest ? 1 : 0 );
 	}
 
+	/**
+	 * @param Cart $cart
+	 */
+	public function sync(Cart $cart) {
+		$this->storages[0]->read($cart);
+		$last_cart = clone $cart;
+		$this->storages[0]->lock(true, $cart);
+		$cart = $last_cart;
+		$this->storages[1]->read($cart);
+		$this->storages[1]->write($cart);
+
+		/*$this->storages[1]->read($cart);
+		$current_cart = clone $cart;
+
+		$this->storages[0]->read($cart);
+		$this->storages[0]->lock(true, $cart);
+		echo "<h1>Item Storage 2</h1>";
+		var_dump($current_cart->items);
+		echo "<hr>";
+		echo "<h1>Item Storage 1</h1>";
+		var_dump($cart->items);
+		//
+		$cart->items = array_merge($current_cart->items, $cart->items);
+		echo "<hr>";
+		echo "<h1>Item After Array Merge</h1>";
+		var_dump($cart->items);
+		$this->storages[1]->write($cart);
+		*/
+	}
+
+	/**
+	 * @return mixed
+	 */
 	public function chooseStorage()
 	{
 		return \Yii::$app->user->isGuest ? $this->storages[0] : $this->storages[1];
 	}
 
+	/**
+	 * @param Cart $cart
+	 */
 	public function read(Cart $cart)
 	{
 		$this->chooseStorage()->read($cart);
-		if($cart->getIsEmpty()){
-			$session = \Yii::$app->session;
-			if($session->get('needSynchronize')==1 and !\Yii::$app->user->isGuest){
-				$this->storages[0]->read($cart);
-				$obj = clone $cart;
-				$this->storages[0]->lock(true, $cart);
-				$cart = $obj;
-				$this->storages[1]->write($cart);
-				$session->set('needSynchronize',0);	
-			}
-			else{
-				$this->chooseStorage()->read($cart);
-			} 				
-		}
-		
 	}
 
+	/**
+	 * @param Cart $cart
+	 */
 	public function write(Cart $cart)
 	{
-		$session = \Yii::$app->session;
-		if($session->get('needSynchronize')==1 and !\Yii::$app->user->isGuest){
-			$obj = clone $cart;
-			$this->storages[0]->lock(true,$cart);
-			$cart = $obj;
-			$session->set('needSynchronize',0);			
-		}
 		$this->chooseStorage()->write($cart);
 	}
 
+	/**
+	 * @param $drop
+	 * @param Cart $cart
+	 */
 	public function lock($drop, Cart $cart)
 	{
 		$this->chooseStorage()->lock($drop, $cart);

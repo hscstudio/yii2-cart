@@ -61,9 +61,6 @@ class Cart extends Component
 	 */
 	public $storage = 'hscstudio\cart\SessionStorage';
 
-	/**
-	 * @throws \yii\base\InvalidConfigException
-	 */
 	public function init()
 	{
 		$this->storage = Instance::ensure($this->storage, Storage::class);

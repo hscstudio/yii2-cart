@@ -39,6 +39,12 @@ ALTER TABLE `cart`
   ADD PRIMARY KEY (`id`);
 ```
 
+or use migration
+
+```
+yii migrate --migrationPath=@hscstudio/cart/migrations
+```
+
 How to use
 ----------
 
@@ -142,6 +148,15 @@ Example configuration for MultipleStorage.
 		],
     ]
 ]
+```
+
+If You use Multiple Storage, so You should add bootstrap in configuration file:
+
+```php
+    'bootstrap' => [
+		...
+		'hscstudio\cart\CartBootstrap'
+	],
 ```
 
 Or You can create and use Your own storageClass, it's should extends abstract class of hscstudio\cart\Storage.
