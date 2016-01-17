@@ -1,5 +1,10 @@
 <?php
-
+/**
+ * @link https://www.github.com/hscstudio/yii2-cart
+ * @copyright Copyright (c) 2016 HafidMukhlasin.com
+ * @license http://www.yiiframework.com/license/
+ */
+ 
 namespace hscstudio\cart;
 use yii\base\Event;
 

@@ -1,6 +1,30 @@
 <?php
-
+/**
+ * @link https://www.github.com/hscstudio/yii2-cart
+ * @copyright Copyright (c) 2016 HafidMukhlasin.com
+ * @license http://www.yiiframework.com/license/
+ */
+ 
 namespace hscstudio\cart;
+
+/**
+ * CookieStorage is extended from Storage Class
+ * 
+ * It's specialty for handling read and write cart data into cookie
+ *
+ * Usage:
+ * Configuration in block component look like this
+ *		'cart' => [
+ *			'class' => 'hscstudio\cart\Cart',
+ *			'storage' => [
+ *				'class' => 'hscstudio\cart\CookieStorage',
+ *			]
+ *		],
+ *
+ * @author Hafid Mukhlasin <hafidmukhlasin@gmail.com>
+ * @since 1.0
+ *
+*/
 
 class CookieStorage extends Storage
 {

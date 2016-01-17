@@ -2,16 +2,10 @@ Shopping cart for Yii 2
 =======================
 
 This extension is improvisation of omnilight/yii2-shopping-cart. It's add shopping cart systems for Yii framework 2.0. 
-It have feature for save to some medium, they are session (default), cookie, localStorage, database, cookieDatabase, sessionDatabase, and localStorageDatabase. 
+It have feature for save to some medium, they are session (default), cookie, localStorage, database, and multiple storage. 
 
-What's is the meaning of the cookieDatabase? 
-It's feature that save cart data to cookie if user is guest, and save to database if user is logged user. 
-
-What's is the meaning of the sessionDatabase? 
-It's feature that save cart data to session if user is guest, and save to database if user is logged user. 
-
-What's is the meaning of the localStorageDatabase? 
-It's feature that save cart data to localStorage if user is guest, and save to database if user is logged user. 
+What's is the meaning of the multiple storage? 
+It's feature that can handle two storage where it will save cart data to storage 1 if user is guest, and save to storage 2 if user is logged user. 
 
 Installation
 ------------
@@ -115,21 +109,40 @@ Also you can use cart as global application component:
 [
     'components' => [
         'cart' => [
-            'class' => 'hscstudio\cart\Cart',
-            'cartId' => 'my_application_cart',
-			'storageClass' => 'hscstudio\cart\LocalDbStorage',
-			'table' => 'cart', 
-        ]
+			'class' => 'hscstudio\cart\Cart',
+		],
     ]
 ]
 ```
 
-Possible values of storageClass are 
+Possible values of storage are 
 - hscstudio\cart\CookieStorage
 - hscstudio\cart\SessionStorage
 - hscstudio\cart\LocalStorage
-- hscstudio\cart\CookieDbStorage
-- hscstudio\cart\SessionDbStorage
+- hscstudio\cart\DatabaseStorage
+- hscstudio\cart\MultipleStorage
+
+Example configuration for MultipleStorage.
+
+```php
+[
+    'components' => [
+        'cart' => [
+			'class' => 'hscstudio\cart\Cart',
+			'storage' => [
+				'class' => 'hscstudio\cart\MultipleStorage',
+				'storages' => [
+					['class' => 'hscstudio\cart\SessionStorage'],
+					[
+						'class' => 'hscstudio\cart\DatabaseStorage',
+						'table' => 'cart',
+					],
+				],
+			]
+		],
+    ]
+]
+```
 
 Or You can create and use Your own storageClass, it's should extends abstract class of hscstudio\cart\Storage.
 It is look like :
