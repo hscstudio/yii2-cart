@@ -164,16 +164,18 @@ class Cart extends Component
 	 */
 	public function deleteById($id)
 	{
-		$this->trigger(self::EVENT_BEFORE_ITEM_REMOVE, new CartActionEvent([
-			'action' => CartActionEvent::ACTION_BEFORE_REMOVE,
-			'item' => $this->items[$id],
-		]));
-		$this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
-			'action' => CartActionEvent::ACTION_BEFORE_REMOVE,
-			'item' => $this->items[$id],
-		]));
-		unset($this->items[$id]);
-		$this->save();
+        if (isset($this->items[$id])) {
+            $this->trigger(self::EVENT_BEFORE_ITEM_REMOVE, new CartActionEvent([
+                'action' => CartActionEvent::ACTION_BEFORE_REMOVE,
+                'item' => $this->items[$id],
+            ]));
+            $this->trigger(self::EVENT_CART_CHANGE, new CartActionEvent([
+                'action' => CartActionEvent::ACTION_BEFORE_REMOVE,
+                'item' => $this->items[$id],
+            ]));
+            unset($this->items[$id]);
+            $this->save();
+        }
 	}
 
 	/**
