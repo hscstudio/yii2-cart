@@ -18,7 +18,7 @@ namespace hscstudio\cart;
  * @property string $serialized Get/set serialized content of the cart
  */
  
-abstract class Storage extends \yii\base\Object
+abstract class Storage extends \yii\base\BaseObject
 {
 	
 	/**

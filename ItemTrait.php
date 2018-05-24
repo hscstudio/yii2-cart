@@ -8,7 +8,6 @@
 namespace hscstudio\cart;
 
 use yii\base\Component;
-use yii\base\Object;
 
 /**
  * Trait ItemTrait
