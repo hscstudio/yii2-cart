@@ -1,5 +1,5 @@
 {
-    "name": "hscstudio/yii2-cart",
+    "name": "dvoiced/yii2-cart",
     "description": "Yii2 extension that adds shopping cart functions",
     "keywords": ["yii", "shopping cart"],
 	"license": "MIT",
