@@ -12,7 +12,7 @@ CREATE TABLE `cart` (
   `id` varchar(255) NOT NULL,
   `user_id` int(11) DEFAULT NULL,
   `name` varchar(255) NOT NULL,
-  `value` text NOT NULL,
+  `value` LONGBLOB NOT NULL,
   `status` tinyint(1) NOT NULL DEFAULT '0'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 ALTER TABLE `cart`
