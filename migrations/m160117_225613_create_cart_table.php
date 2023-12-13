@@ -5,7 +5,7 @@ use yii\db\Schema;
 
 class m160117_225613_create_cart_table extends Migration
 {
-	/**
+    /**
      *
      */
     public function up()
@@ -20,13 +20,13 @@ class m160117_225613_create_cart_table extends Migration
             'id' => $this->string(255),
             'user_id' => $this->integer(11),
             'name' => $this->string(255)->notNull(),
-            'value' => $this->text()->notNull(),
+            'value' => 'LONGBLOB NOT NULL',
             'status' => $this->boolean()->notNull()->defaultValue(0),
             'PRIMARY KEY (id)',
-        ],$tableOptions);
+        ], $tableOptions);
     }
 
-	/**
+    /**
      * @return bool
      */
     public function down()
